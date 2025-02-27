@@ -423,7 +423,8 @@ struct emitter {
     
     /**-----------------------------------------------------------------------
      * get_meta()
-     *   [throws] Retrieves metadata object in specified `tuple` type. <Handle>
+     *   Retrieves metadata object in specified `tuple` type. <Throws>
+     *   `wrong_type` if `T` does not match the underlying metadata. <Handle>
      *   that refers to the callback metadata will be retrieved from. <T> is
      *   the type the metadata is in, which must always include `tuple`.
      *   <Returns> the metadata associated with the specified handle cast to
@@ -538,10 +539,11 @@ struct emitter {
 
     /**-----------------------------------------------------------------------
      * set_interceptor()
-     *   [throws] Sets a function that will wrap every callback function that
-     *   is inserted past this point. The handler is inputted as a parameter
-     *   to the interceptor, so that the interceptor can modify the behaviour
-     *   surrounding the handler as it sees fit. <Function> is the
+     *   Sets a function that will wrap every callback function that is
+     *   inserted past this point. The handler is inputted as a parameter to
+     *   the interceptor, so that the interceptor can modify the behaviour
+     *   surrounding the handler as it sees fit. <Throws> `wrong_type` if `F`
+     *   is not of a valid interceptor function type. <Function> is the
      *   interceptor that wraps handlers inserted past this point. <Returns>
      *   `*this` for chaining.
      *-----------------------------------------------------------------------**/
@@ -590,11 +592,13 @@ struct emitter {
     
     /**-----------------------------------------------------------------------
      * insert()
-     *   [thread-safe] [throws] Inserts a callback to be outputted when emit()
-     *   is called by the event creator. <Function> is the handler that will
-     *   become part of the event, that will run whenever emit() is called.
-     *   <Weight> is the priority level for `Function` in the handler list.
-     *   <Returns> `*this` for chaining.
+     *   [thread-safe] Inserts a callback to be outputted when emit() is called
+     *   by the event creator. <Throws> `wrong_type` if `F` is not of the
+     *   accepted function type. <Throws> `wrong_type` if the user-provided
+     *   metadata is of a type that is not accepted. <Function> is the handler
+     *   that will become part of the event, that will run whenever emit() is
+     *   called. <Weight> is the priority level for `Function` in the handler
+     *   list. <Returns> `*this` for chaining.
      *-----------------------------------------------------------------------**/
     template<typename F, typename = enable_if_callable<F>>
     event &insert (const F &Function, weight Weight = 0) {
@@ -733,9 +737,10 @@ struct emitter {
 
     /**-----------------------------------------------------------------------
      * emit()
-     *   [thread-safe] [throws] Runs all callback functions (or handlers) of
-     *   the event. <Arguments> are the arguments that will be forwarded to all
-     *   handlers.
+     *   [thread-safe] Runs all callback functions (or handlers) of the event.
+     *   <Throws> `wrong_arguments` if the arguments inputted do not correspond
+     *   to the event argument types. <Arguments> are the arguments that will
+     *   be forwarded to all handlers.
      *-----------------------------------------------------------------------**/
     template<typename... Args>
     void emit (Args... Arguments) {
@@ -1044,10 +1049,11 @@ struct emitter {
 
   /**-------------------------------------------------------------------------
    * operator[]()
-   *   [throws] Retrieve an event by name, or insert one if it does not exist
-   *   before retrieving it if the emitter has its `DefaultEventType`
-   *   specified. <Name> is the name of the event to be retrieved. <Returns>
-   *   the event by name `Name` if it exists or was implicitly created.
+   *   Retrieve an event by name, or insert one if it does not exist before
+   *   retrieving it if the emitter has its `DefaultEventType` specified.
+   *   <Throws> `no_such_event` if no event by name `Name` exists. <Name> is
+   *   the name of the event to be retrieved. <Returns> the event by name
+   *   `Name` if it exists or was implicitly created.
    *-------------------------------------------------------------------------**/
   event &operator[] (string Name) {
     if constexpr (!is_void_v<DefaultEventType>) {

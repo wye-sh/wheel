@@ -263,7 +263,6 @@ The function type used for set_on_insert() and set_on_remove(), which define the
 ##
 
 ### event::get_meta()
-`throws`
 ```cpp
 template<typename T>
 T &get_meta (handle &Handle);
@@ -278,6 +277,9 @@ Retrieves metadata object in specified `tuple` type.
 
 #### Returns
 Metadata associated with the specified handle cast to the specified type.
+
+#### Throws
+`wrong_type` if `T` does not match the underlying metadata.
 
 ##
 
@@ -384,7 +386,6 @@ Unsets the function previously set through set_on_remove().
 ##
 
 ### event::set_interceptor()
-`throws`
 ```cpp
 template<typename F>
 event &set_interceptor (F Function);
@@ -396,6 +397,9 @@ Sets a function that will wrap every callback function that is inserted past thi
 
 #### Returns
 `*this` for chaining.
+
+#### Throws
+`wrong_type` if `F` is not of a valid interceptor function type.
 
 ##
 
@@ -426,7 +430,7 @@ Generates a metadata `tuple` that can be used to communicate with the event crea
 ##
 
 ### event::insert()
-`thread-safe` `throws`
+`thread-safe`
 ```cpp
 template<typename F, typename = enable_if_callable<F>>
 event &insert (const F &Function, weight Weight = 0);
@@ -439,6 +443,10 @@ Inserts a callback to be outputted when emit() is called by the event creator.
 
 #### Returns
 `*this` for chaining.
+
+#### Throws
+- `wrong_type` if `F` is not of the accepted function type.
+- `wrong_type` if the user-provided metadata is of a type that is not accepted.
 
 ##
 
@@ -481,7 +489,7 @@ Removes a callback function per its handle, which was retrieved by dereferencing
 ##
 
 ### event::emit()
-`thread-safe` `throws`
+`thread-safe`
 ```cpp
 template<typename... Args>
 void emit (Args... Arguments);
@@ -490,6 +498,9 @@ Runs all callback functions (or handlers) of the event.
 
 #### Parameters
 - `Arguments`: Arguments that will be forwarded to all handlers.
+
+#### Throws
+`wrong_arguments` if the arguments inputted do not correspond to the event argument types.
 
 ##
 
@@ -581,7 +592,6 @@ Check if an event exists.
 ##
 
 ### emitter::operator\[\]()
-`throws`
 ```cpp
 event &operator[] (string Name);
 ```
@@ -592,6 +602,9 @@ Retrieve an event by name, or insert one if it does not exist before retrieving 
 
 #### Returns
 Event by name `Name` if it exists or was implicitly created.
+
+#### Throws
+`no_such_event` if no event by name `Name` exists.
 
 ##
 
