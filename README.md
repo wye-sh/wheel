@@ -29,7 +29,7 @@ include(FetchContent)
 FetchContent_Declare(
   wheel
   GIT_REPOSITORY https://github.com/wye-sh/wheel
-  GIT_TAG v1.0.1 # (latest version)
+  GIT_TAG v1.1.0 # (latest version)
 )
 FetchContent_MakeAvailable(wheel);
 
@@ -164,6 +164,7 @@ Events["self-destruct"].unset_on_remove();
     - [struct emitter::event](#struct-emitterevent)
       - [using event::weight](#using-eventweight)
       - [using event::on_function](#using-eventon_function)
+      - [event::get_function()](#eventget_function)
       - [event::get_meta()](#eventget_meta)
       - [event::set_meta()](#eventset_meta)
       - [event::is_meta_of()](#eventis_meta_of)
@@ -260,6 +261,27 @@ Specifies the level of precedence a callback takes in the order of execution whe
 using on_function = function<void (handle &)>;
 ```
 The function type used for set_on_insert() and set_on_remove(), which define the behaviour that happens before and respectively after a callback function is added or removed.
+
+##
+
+### event::get_function()
+```cpp
+template<typename T>
+function<T> &get_function (handle &Handle);
+```
+Retrieves function associated with handle.
+
+#### Template Parameters
+- `T`: Type the function is in.
+
+#### Parameters
+- `Handle`: Handle from which a lambda will be retrieved.
+
+#### Returns
+Lambda object associated with hanled.
+
+#### Throws
+`wrong_type` if `T` does not match the underlying lambda type.
 
 ##
 

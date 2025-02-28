@@ -436,6 +436,30 @@ struct emitter {
       }
       return *this;
     } // operator=()
+
+    /**-----------------------------------------------------------------------
+     * get_function()
+     *   Retrieves function associated with handle. <Handle> is the handle from
+     *   which a lambda will be retrieved. <T> is the type the function is in.
+     *   <Throws> `wrong_type` if `T` does not match the underlying lambda
+     *   type. <Returns> the lambda object associated with hanled.
+     *-----------------------------------------------------------------------**/
+    template<typename T>
+    function<T> &get_function (handle &Handle) {
+      using F = function<T>;
+      
+      // exception: wrong_type /////////////////////////////////////////////////
+      if (&typeid(F) != AcceptedFunctionType)
+	throw wrong_type
+	  (Name, { AcceptedFunctionType }, &typeid(F),
+	   "lambda", "get_lambda()");
+      //////////////////////////////////////////////////////////////////////////
+      
+      slot &Slot = Slots[*Handle];
+      shared_ptr<void> &FunctionPointer = Slot.Function;
+      F *Function = (F *)FunctionPointer.get();
+      return *Function;
+    } // get_function()
     
     /**-----------------------------------------------------------------------
      * get_meta()
