@@ -134,6 +134,15 @@ TEST_CASE("Type Checking", "[test]") {
   REQUIRE_THROWS_AS(Events["constrain"](string("")) = []() {}, wheel::wrong_type);
   REQUIRE_NOTHROW(Events["constrain"](34) = []() {});
   REQUIRE_NOTHROW(Events["constrain"](98.7) = []() {});
+
+  Events.create<void (float &)>("reference");
+  Events["reference"] = [](float &A) {
+    A = 12;
+  };
+  float B = 10;
+  REQUIRE_NOTHROW(Events["reference"].emit<float &>(B));
+  REQUIRE_THROWS_AS(Events["reference"].emit(B), wheel::wrong_arguments);
+  REQUIRE(B == 12);
 }
 
 TEST_CASE("Removal", "[test]") {

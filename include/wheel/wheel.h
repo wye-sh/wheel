@@ -42,6 +42,25 @@ string demangle (const char *Name) {
 } // demangle()
 string demangle (const type_info &Info) { return demangle(Info.name()); }
 
+/**
+ * demangle_rcv()
+ *   Version of demangle that maintains reference-const-volatile markers.
+ */
+template<typename T>
+string demangle_rcv () {
+  using NoRef = remove_reference_t<T>;
+  string Base = demangle(typeid(NoRef).name());
+  if constexpr (is_const_v<NoRef>)
+    Base += " const";
+  if constexpr (is_volatile_v<NoRef>)
+    Base += " volatile";
+  if constexpr (is_lvalue_reference_v<T>)
+    Base += "&";
+  else if constexpr (is_rvalue_reference_v<T>)
+    Base += "&&";
+  return Base;
+} // demangle_rcv()
+
 /*
  * stringify_parameter_pack()
  *   Will demangle each template argument and generate from them a comma-
@@ -50,11 +69,8 @@ string demangle (const type_info &Info) { return demangle(Info.name()); }
 template<typename... Args>
 string stringify_parameter_pack () {
   string String;
-  const auto AddType = [](auto Index, auto Type) {
-    return (Index == 0 ? "" : ", ") + string(demangle(typeid(Type)));
-  }; // AddType()
   size_t Index = 0;
-  ((String += AddType(Index ++, Args{})), ...);
+  ((String += ((Index++ == 0) ? "" : ", ") + demangle_rcv<Args>()), ...);
   return String;
 } // stringify_parameter_pack()
 
@@ -140,8 +156,8 @@ struct wrong_type: exception {
      const type_info           *UserType,
      string                     What  = "",
      string                     Scope = "")
-      : EventName   (EventName),
-	UserType    (demangle(*UserType)) {
+      : EventName(EventName),
+	UserType (demangle(*UserType)) {
     for (const type_info *AcceptedType : AcceptedTypes)
       this->AcceptedTypes.push_back(demangle(*AcceptedType));
     
@@ -1043,7 +1059,7 @@ struct emitter {
    *   checked if it exists. <Returns> `true` if an event by name `Name`
    *   exists.
    *-----------------------------------------------------------------------**/
-  bool &contains (string Name) {
+  bool contains (string Name) {
     return NameToEvent.contains(Name);
   } // constains()
 
