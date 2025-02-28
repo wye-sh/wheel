@@ -29,7 +29,7 @@ include(FetchContent)
 FetchContent_Declare(
   wheel
   GIT_REPOSITORY https://github.com/wye-sh/wheel
-  GIT_TAG v1.1.0 # (latest version)
+  GIT_TAG v1.1.1 # (latest version)
 )
 FetchContent_MakeAvailable(wheel);
 
@@ -642,7 +642,7 @@ The type of a handle used for the removal and otherwise identification of callba
 ### wheel::demangle_rcv()
 ```cpp
 template<typename T>
-string demangle_rcv ();
+inline string demangle_rcv ();
 ```
 Version of demangle that maintains reference-const-volatile markers.
 

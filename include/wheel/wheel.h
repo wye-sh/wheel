@@ -32,7 +32,7 @@ using namespace std;
  *   `Info` into a human readable format. Returns the human readable
  *   representation as a `string`.
  */
-string demangle (const char *Name) {
+inline string demangle (const char *Name) {
   int Status = -1;
   unique_ptr<char, void(*)(void *)> Resource {
     abi::__cxa_demangle(Name, NULL, NULL, &Status),
@@ -40,14 +40,14 @@ string demangle (const char *Name) {
   };
   return (Status == 0) ? Resource.get() : Name;
 } // demangle()
-string demangle (const type_info &Info) { return demangle(Info.name()); }
+inline string demangle (const type_info &Info) { return demangle(Info.name()); }
 
 /**
  * demangle_rcv()
  *   Version of demangle that maintains reference-const-volatile markers.
  */
 template<typename T>
-string demangle_rcv () {
+inline string demangle_rcv () {
   using NoRef = remove_reference_t<T>;
   string Base = demangle(typeid(NoRef).name());
   if constexpr (is_const_v<NoRef>)
@@ -67,7 +67,7 @@ string demangle_rcv () {
  *   separated list string, which is returned.
  */
 template<typename... Args>
-string stringify_parameter_pack () {
+inline string stringify_parameter_pack () {
   string String;
   size_t Index = 0;
   ((String += ((Index++ == 0) ? "" : ", ") + demangle_rcv<Args>()), ...);

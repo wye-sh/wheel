@@ -29,7 +29,7 @@ include(FetchContent)
 FetchContent_Declare(
   wheel
   GIT_REPOSITORY https://github.com/wye-sh/wheel
-  GIT_TAG v1.1.0 # (latest version)
+  GIT_TAG v1.1.1 # (latest version)
 )
 FetchContent_MakeAvailable(wheel);
 
