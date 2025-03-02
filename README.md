@@ -190,7 +190,6 @@ Events["self-destruct"].unset_on_remove();
     - [emitter::contains()](#emittercontains)
     - [emitter::operator\[\]()](#emitteroperator-1)
   - [using wheel::handle](#using-wheelhandle)
-  - [wheel::demangle_rcv()](#wheeldemangle_rcv)
 - [with()](#with)
 
 ##
@@ -636,15 +635,6 @@ Event by name `Name` if it exists or was implicitly created.
 using handle = shared_ptr<int>;
 ```
 The type of a handle used for the removal and otherwise identification of callbacks inside an event.
-
-##
-
-### wheel::demangle_rcv()
-```cpp
-template<typename T>
-inline string demangle_rcv ();
-```
-Version of demangle that maintains reference-const-volatile markers.
 
 ##
 

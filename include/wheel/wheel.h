@@ -42,7 +42,7 @@ inline string demangle (const char *Name) {
 } // demangle()
 inline string demangle (const type_info &Info) { return demangle(Info.name()); }
 
-/**
+/*
  * demangle_rcv()
  *   Version of demangle that maintains reference-const-volatile markers.
  */
