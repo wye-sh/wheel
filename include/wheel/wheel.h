@@ -754,7 +754,7 @@ struct emitter {
      *-----------------------------------------------------------------------**/
     event &remove (handle &Handle) {
       if (Handle == nullptr || *Handle == -1)
-	// Make sure `handle` is valid
+	// Make sure `Handle` is valid
 	return *this;
 
       // lock_guard: Mutex /////////////////////////////////////////////////////
@@ -763,13 +763,13 @@ struct emitter {
       if (IsCalling) {
 	// If we are currently calling the functions stored in this event, we
 	// must defer removing to not upset the iteration
-
+	
 	Slots[*Handle].ScheduledForRemoval = true;
 	DeferredRemoves.push_back(Handle);
 	return *this; // [return]
       }
-
-      internal_remove(Handle);
+      
+      internal_remove<false>(Handle);
       //////////////////////////////////////////////////////////////////////////
 
       return *this;
@@ -983,7 +983,14 @@ struct emitter {
      *   will also be used for deferred removal. One major difference between
      *   this method and `remove` is that this method is NOT thread-safe.
      */
+    template<bool CheckHandleValidity = true>
     void internal_remove (handle &Handle) {
+      if constexpr (CheckHandleValidity) {
+	if (Handle == nullptr || *Handle == -1)
+	  // Make sure `Handle` is valid
+	  return;
+      }
+      
       // If an on remove function is specified, we run it here prior to deleting
       // the element so its information still remains
       if (OnRemoveFunction) {
@@ -993,12 +1000,12 @@ struct emitter {
 
       int LastIndex = Slots.size() - 1;
       int Index = *Handle;
-      Handle = make_shared<int>(-1);
+      *Handle = -1;
       // ^- In case the handle still is in use somewhere, we set it to `-1` to
       //    inform the user it is invalid
       
       if (Index < LastIndex) {
-	Slots[Index] = Slots[LastIndex];
+	Slots[Index] = std::move(Slots[LastIndex]);
 	*Slots[Index].Handle = Index;
       }
       Slots.pop_back(); // Remove the last element

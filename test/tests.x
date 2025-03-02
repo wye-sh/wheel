@@ -287,6 +287,77 @@ TEST_CASE("Custom Events", "[test]") {
   REQUIRE(Ns == list({ 0, 1, 2, 3, 4 }));
 }
 
+TEST_CASE("Tick Event", "[test]") {
+  wheel::emitter<> Events;
+
+  struct limiter_t {
+    double time_per_call;
+    double previous_time;
+
+    limiter_t (uint32_t n_calls, double time_period):
+      time_per_call(time_period / n_calls),
+      previous_time(0.0) {}
+
+    /**
+     * Returns the number of calls that need to be processed before all caught up
+     * with the timing specified in `this` limiter.
+     */
+    uint32_t N () {
+      return 1;
+    }
+  }; // struct limiter_t
+  
+  Events.create<void ()>("tick");
+  wheel::emitter<>::event *Tick = &Events["tick"];
+  Tick
+    ->meta_accepts<tuple<int, double>>()
+    .set_on_insert([=](wheel::handle &Handle) {
+      auto [ N, T ] = Tick->get_meta<tuple<int, double>>(Handle);
+      Tick->set_meta(Handle, limiter_t(N, T));
+    })
+    .set_interceptor([=](wheel::handle &Handle, function<void ()> Target) {
+      int I, N;
+      auto [ Limiter ] = Tick->get_meta<tuple<limiter_t>>(Handle);
+      N = Limiter.N();
+      for (I = 0; I < N; ++ I)
+	Target();
+    });
+  
+  wheel::handle Handle1;
+  Events["tick"](60, 1.0) = [&]() {
+    printf("tick!\n");
+    Events["tick"].remove(Handle1);
+  };
+  Handle1 = *Events;
+  wheel::handle Handle2;
+  Events["tick"](60, 1.0) = [&]() {
+    printf("tick!\n");
+    Events["tick"].remove(Handle1);
+  };
+  Handle1 = *Events;
+  wheel::handle Handle3;
+  Events["tick"](60, 1.0) = [&]() {
+    printf("tick!\n");
+    Events["tick"].remove(Handle1);
+  };
+  Handle1 = *Events;
+  wheel::handle Handle4;
+  Events["tick"](60, 1.0) = [&]() {
+    printf("tick!\n");
+    Events["tick"].remove(Handle1);
+  };
+  Handle1 = *Events;
+  wheel::handle Handle5;
+  Events["tick"](60, 1.0) = [&]() {
+    printf("tick!\n");
+    Events["tick"].remove(Handle1);
+  };
+  Handle1 = *Events;
+
+  for (int I = 0; I < 50; ++ I)
+    Events["tick"].emit();
+}
+
 TEST_CASE("Default Event Type", "[test]") {
   // Check usage of default event type, seeing if new events are indeed set up
   // automatically if one is specified (autovivification)
