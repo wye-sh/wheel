@@ -104,11 +104,11 @@ TEST_CASE("Type Checking", "[test]") {
   Events
     .create<void()>("meta")
     .set_on_insert([&](wheel::handle &Handle) {
-      REQUIRE_THROWS_AS(Events["meta"].get_meta<tuple<int>>(Handle), wheel::wrong_type);
-      REQUIRE_NOTHROW(Events["meta"].get_meta<tuple<int, double>>(Handle));
+      REQUIRE_THROWS_AS(Events["meta"].get_meta<int>(Handle), wheel::wrong_type);
+      REQUIRE_NOTHROW(Events["meta"].get_meta<int, double>(Handle));
       Events["meta"].set_meta(Handle, 65, 32);
-      REQUIRE_THROWS_AS((Events["meta"].get_meta<tuple<int, double>>(Handle)), wheel::wrong_type);
-      REQUIRE_NOTHROW(Events["meta"].get_meta<tuple<int, int>>(Handle));
+      REQUIRE_THROWS_AS((Events["meta"].get_meta<int, double>(Handle)), wheel::wrong_type);
+      REQUIRE_NOTHROW(Events["meta"].get_meta<int, int>(Handle));
     });
   Events["meta"](12, 34.0) = []() {
     // ...
@@ -126,10 +126,13 @@ TEST_CASE("Type Checking", "[test]") {
   // Verify meta constraining functionality
   Events
     .create<void ()>("constrain")
-    .meta_accepts<tuple<int, double>>();
+    .meta_accepts<int, double>();
   REQUIRE_THROWS_AS(Events["constrain"] = []() {}, wheel::wrong_type);
   REQUIRE_NOTHROW(Events["constrain"](1, 3.4) = []() {});
-  Events["constrain"].meta_accepts<tuple<int>, tuple<double>>();
+  Events["constrain"]
+    .meta_accepts_anything()
+    .meta_accepts<int>()
+    .meta_accepts<double>();
   REQUIRE_THROWS_AS(Events["constrain"] = []() {}, wheel::wrong_type);
   REQUIRE_THROWS_AS(Events["constrain"](string("")) = []() {}, wheel::wrong_type);
   REQUIRE_NOTHROW(Events["constrain"](34) = []() {});
@@ -228,11 +231,11 @@ TEST_CASE("Custom Events", "[test]") {
   Events
     .create<void ()>("test")
     .set_on_insert([&](wheel::handle &Handle) {
-      auto [ N ] = Events["test"].get_meta<tuple<int>>(Handle);
+      auto [ N ] = Events["test"].get_meta<int>(Handle);
       Events["test"].set_meta(Handle, N / 2);
     })
     .set_interceptor([&](wheel::handle &Handle, function<void ()> Target) {
-      auto [ N ] = Events["test"].get_meta<tuple<int>>(Handle);
+      auto [ N ] = Events["test"].get_meta<int>(Handle);
       for (int i = 0; i < N; ++ i)
 	Target();
       int Q = N - 1;
@@ -274,9 +277,9 @@ TEST_CASE("Custom Events", "[test]") {
   // Repeater event
   list<int> Ns;
   Events.create<void (int)>("repeater")
-    .meta_accepts<tuple<int>>()
+    .meta_accepts<int>()
     .set_interceptor([&](wheel::handle &Handle, function<void (int)> Target, int I) {
-      auto [ N ] = Events["repeater"].get_meta<tuple<int>>(Handle);
+      auto [ N ] = Events["repeater"].get_meta<int>(Handle);
       for (int I = 0; I < N; ++ I)
 	Target(I);
     });
@@ -310,14 +313,14 @@ TEST_CASE("Tick Event", "[test]") {
   Events.create<void ()>("tick");
   wheel::emitter<>::event *Tick = &Events["tick"];
   Tick
-    ->meta_accepts<tuple<int, double>>()
+    ->meta_accepts<int, double>()
     .set_on_insert([=](wheel::handle &Handle) {
-      auto [ N, T ] = Tick->get_meta<tuple<int, double>>(Handle);
+      auto [ N, T ] = Tick->get_meta<int, double>(Handle);
       Tick->set_meta(Handle, limiter_t(N, T));
     })
     .set_interceptor([=](wheel::handle &Handle, function<void ()> Target) {
       int I, N;
-      auto [ Limiter ] = Tick->get_meta<tuple<limiter_t>>(Handle);
+      auto [ Limiter ] = Tick->get_meta<limiter_t>(Handle);
       N = Limiter.N();
       for (I = 0; I < N; ++ I)
 	Target();
@@ -325,31 +328,26 @@ TEST_CASE("Tick Event", "[test]") {
   
   wheel::handle Handle1;
   Events["tick"](60, 1.0) = [&]() {
-    printf("tick!\n");
     Events["tick"].remove(Handle1);
   };
   Handle1 = *Events;
   wheel::handle Handle2;
   Events["tick"](60, 1.0) = [&]() {
-    printf("tick!\n");
     Events["tick"].remove(Handle1);
   };
   Handle1 = *Events;
   wheel::handle Handle3;
   Events["tick"](60, 1.0) = [&]() {
-    printf("tick!\n");
     Events["tick"].remove(Handle1);
   };
   Handle1 = *Events;
   wheel::handle Handle4;
   Events["tick"](60, 1.0) = [&]() {
-    printf("tick!\n");
     Events["tick"].remove(Handle1);
   };
   Handle1 = *Events;
   wheel::handle Handle5;
   Events["tick"](60, 1.0) = [&]() {
-    printf("tick!\n");
     Events["tick"].remove(Handle1);
   };
   Handle1 = *Events;

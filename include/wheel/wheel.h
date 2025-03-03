@@ -463,24 +463,25 @@ struct emitter {
     
     /**-----------------------------------------------------------------------
      * get_meta()
-     *   Retrieves metadata object in specified `tuple` type. <Throws>
-     *   `wrong_type` if `T` does not match the underlying metadata. <Handle>
-     *   that refers to the callback metadata will be retrieved from. <T> is
-     *   the type the metadata is in, which must always include `tuple`.
-     *   <Returns> the metadata associated with the specified handle cast to
-     *   the specified type.
+     *   Retrieves metadata tuple with specified types. <Args> are the types
+     *   that the metadata tuple stores. <Handle> refers to the callback that
+     *   metadata will be retrieved from. <Throws> `wrong_type` if provided
+     *   `Args` do not match the underlying types of the metadata for `Handle`.
+     *   <Returns> the metadata tuple associated with the specified handle.
      *-----------------------------------------------------------------------**/
-    template<typename T>
-    T &get_meta (handle &Handle) {
+    template<typename... Args>
+    tuple<Args...> &get_meta (handle &Handle) {
+      using T = tuple<Args...>;
+      
       slot &Slot = Slots[*Handle];
-
+      
       // exception: wrong_type /////////////////////////////////////////////////
       if (&typeid(T) != Slot.MetaType)
 	throw wrong_type
 	  (Name, { Slot.MetaType }, &typeid(T),
 	   "meta", "get_meta()");
       //////////////////////////////////////////////////////////////////////////
-
+      
       return any_cast<T &>(Slot.Meta);
     } // get_meta()
 
@@ -500,36 +501,45 @@ struct emitter {
       Slot.Meta     = Meta;
       Slot.MetaType = const_cast<type_info *>(&typeid(Meta));
     } // set_meta()
-    
-    /**-----------------------------------------------------------------------
-     * is_meta_of()
-     *   Checks what type a metadata object is. <T> is the type to check if
-     *   the metadata is of, and this will always be a `tuple` type. <Handle>
-     *   refers to the callback that owns the metadata to be checked. <Returns>
-     *   `true` if it is of type `T`, and `false` if it is not.
-     *-----------------------------------------------------------------------**/
-    template<typename T>
-    bool is_meta_of (handle &Handle) {
-      return Slots[*Handle].Meta.type() == typeid(T);
-    } // is_meta_of()
 
     /**-----------------------------------------------------------------------
+     * is_meta_of()
+     *   Checks if the types of the metadata object associated with `Handle`
+     *   is the specified arguments `Args`. <Handle> is the handle associated
+     *   with a callback function. <Args> are the types we are comparing with
+     *   the metadata type to see if they match. <Returns> `true` if the
+     *   types of metadata match `Args` and `false` otherwise.
+     *-----------------------------------------------------------------------**/
+    template<typename... Args>
+    bool is_meta_of (handle &Handle) {
+      return Slots[*Handle].Meta.type() == typeid(tuple<Args...>);
+    } // is_meta_of()
+    
+    /**-----------------------------------------------------------------------
      * meta_accepts()
-     *   When this is set, only the mentioned meta types are accepted when added
-     *   by the user through the operator(). If the meta data type is not one of
-     *   the ones specified here, operator() will henceforth throw a wrong_type
-     *   exception. <Args> is the list of tuples the meta data are permitted to
-     *   be of. <Returns> `*this` for chaining.
+     *   Call this once for each type the metadata can have. If the user has
+     *   not specified metadata using operator()() that meets the criteria,
+     *   the insert() and operator=() functions will throw an exception.
+     *   <Args> are the types of a single accepted metadata type. <Returns>
+     *   `*this` for chaining.
      *-----------------------------------------------------------------------**/
     template<typename... Args>
     event &meta_accepts () {
-      AcceptedMetaTypes.clear();
-      if constexpr (sizeof...(Args) > 0) {
-	// Add all provided tuple types as type_info* to the accepted meta types
-	(AcceptedMetaTypes.push_back(&typeid(Args)), ...);
-      }
+      AcceptedMetaTypes.push_back(&typeid(tuple<Args...>));
       return *this;
     } // meta_accepts()
+
+    /**-----------------------------------------------------------------------
+     * meta_accepts_anything()
+     *   This only needs to be called if meta_accepts() has already been
+     *   called, and the desired behaviour is to undo all hitherto specified
+     *   accepted meta types, making operator() revert to accept any metadata
+     *   types whatever. <Returns> `*this` for chaining.
+     *-----------------------------------------------------------------------**/
+    event &meta_accepts_anything () {
+      AcceptedMetaTypes.clear();
+      return *this;
+    } // meta_accepts_anything()
 
     /**-----------------------------------------------------------------------
      * set_on_insert()

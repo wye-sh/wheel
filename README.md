@@ -9,6 +9,7 @@ and thread-safe operation.
 - [Installation](#installation)
   - [Options](#options)
 - [Quick Start](#quick-start)
+- [Examples](#examples)
 - [Documentation](#documentation)
 
 ## Overview
@@ -29,7 +30,7 @@ include(FetchContent)
 FetchContent_Declare(
   wheel
   GIT_REPOSITORY https://github.com/wye-sh/wheel
-  GIT_TAG v1.1.2 # (latest version)
+  GIT_TAG v2.0.0 # (latest version)
 )
 FetchContent_MakeAvailable(wheel);
 
@@ -51,107 +52,171 @@ does not have any options, but its dependencies can be configured:
 To get started:
 
 ```cpp
-// Create an emitter that can hold events of any type
+// Create emitter that can store multiple events
 wheel::emitter Events;
 
-// Alternatively, specify a default type for automatic event creation
-// (autovivification) when accessing non-existent events
-// # wheel::emitter<void(int)> Events;
+// Add "key-down" event that takes a `char32_t`
+Events.create<void (char32_t)>("key-down");
 
-// Create a simple event that takes no parameters
-Events.create<void()>("window-entered");
-
-// Create an event with parameters
-Events.create<void(int, action)>("key-press");
-
-// Subscribe to events using lambda functions
-Events["window-entered"] = []() { printf("First!\n"); };
-
-// Store a handle to remove the callback later
-wheel::handle Handle = *Events;
-// You can remove it later as follows using the handle:
-// # Events["window-entered"].remove(Handle);
-
-// Subscribe with a callback that accepts parameters
-Events["key-press"] = [](int Key, action Action) {
-if (Action == action::down)
-  printf("Pressed down key `%d`.\n", Key);
+// Insert a handler
+Events["key-down"] = [](char32_t Codepoint) {
+  printf("[1]: Key Down: %c", (char) Codepoint);
 };
 
-// Add multiple callbacks to the same event
-Events["window-entered"] = []() { printf("Second!\n"); };
+// Save handle to most recently added handler
+wheel::handle Handle = *Events;
 
-// Control execution order with weighted callbacks (higher weight = heigher
-// execution priority)
-Events["window-entered"].insert([]() {
-  printf("I run before the one who says \"First!\"\n");
+// Insert a weighted handler (default weight is zero)
+Events["key-down"].insert([](char32_t Codepoint) {
+  printf("[0]: Key Down: %c", (char) Codepoint);
 }, 1);
 
-// Trigger events, executing their callbacks
-Events["key-press"].emit(12, action::down);
+// Call all "key-down" handlers
+Events["key-down"].emit((char32_t) 'p');
 // Output:
-// $ Pressed down key `12`.
+// $ [0] Key Down: p
+// $ [1] Key Down: p
 
-Events["window-entered"].emit();
+// Remove handler using saved handle. The handle we retrieved earlier can be
+// used to remove the handler it references from anywhere, including from
+// inside itself.
+Events["key-down"].remove(Handle);
+
+// Call "key-down" handlers again
+Events["key-down"].emit((char32_t) 'r');
 // Output:
-// $ I run before the one who says "First!"
-// $ First!
-// $ Second!
+// $ [0] Key Down: r
 ```
 
-To set up custom events:
+## Examples
+
+More advanced examples:
+
+### Self-Destruct Event
 
 ```cpp
-// Create an event with metadata and custom execution
-Events.create<void(int)>("repeater")
-  .meta_accepts<tuple<int>>()
-  .set_interceptor([](wheel::handle &Handle, function<void(int)> Target, int _) {
-    auto [ N ] = Events["repeater"].get_meta<tuple<int>>(Handle);
-	for (int I = 0; I < N; ++ I)
-	  Target(I);
-  });
+// Create emitter
+wheel::emitter Events;
 
-// Attach callbacks with metadata (5 and 2 repetitions)
-Events["repeater"](5) = [](int I) { printf("X: [%d]\n", I); };
-Events["repeater"](2) = [](int I) { printf("Y: [%d]\n", I); };
-
-// Metadata flow: Users set metadata with the call operator (shown above),
-// while event creators can access or modify it via the get_meta() and
-// set_meta() methods using a valid wheel::handle.
-
-// Metadata-driven emit
-Events["repeater"].emit(0);
-// Output:
-// $ X: [0]
-// $ X: [1]
-// $ X: [2]
-// $ X: [3]
-// $ X: [4]
-// $ Y: [0]
-// $ Y: [1]
-
-// Create an event using callback lifecycle hooks
-Events.create<void()>("self-destruct")
+// Add event that removes handlers as they are added
+Events
+  .create<void ()>("self-destruct")
   .set_on_insert([&](wheel::handle &Handle) {
-    // Remove callback directly when it was added
     Events["self-destruct"].remove(Handle);
   })
-  .set_on_remove([&](wheel::handle &Handle) {
+  .set_on_remove([](wheel::handle &Handle) {
     printf("Boom!\n");
   });
 
-// Add callback and emit()
-Events["self-destruct"] = []() { printf("This will not run.\n"); };
-Events["self-destruct"].emit();
+// Insert handlers
+Events["self-destruct"] = []() { /* ... */ };
 // Output:
 // $ Boom!
-// The "self-destruct" event will always be zero-length
+Events["self-destruct"] = []() { /* ... */ };
+// Output:
+// $ Boom!
 
-// Disable custom behaviours
-Events["repeater"].unset_interceptor();
-Events["self-destruct"].unset_on_insert();
-Events["self-destruct"].unset_on_remove();
-// "repeater" and "self-destruct" will now behave normally
+// emit() does nothing because there are no handlers
+Events["self-destruct"].emit();
+```
+
+### Repeater Event
+
+```cpp
+// Create emitter
+wheel::emitter Events;
+
+// Add event where handlers run a configurable number of times
+Events
+  .create<void (int)>("repeater")
+  .meta_accepts<int>()
+  .set_interceptor
+    ([](wheel::handle &Handle, function<void (int)> Target, int Unused) {
+      auto [ N ] = Events["repeater"].get_meta<int>();
+      for (int I = 0; I < N; ++ I)
+        Target(I);
+    });
+
+// Insert a handler whose body will be repeated five times
+Events["repeater"](5) = [](int I) {
+  printf("One: %d/5\n", I + 1);
+};
+
+// Insert a handler whose body will be repeated two times
+Events["repeater"](2) = [](int I) {
+  printf("Two: %d/2\n", I + 1);
+};
+
+// Call all "repeater" handlers (`int` argument is still required to conform
+// with the event type)
+Events["repeater"].emit(0);
+// Output:
+// $ One: 1/5
+// $ One: 2/5
+// $ One: 3/5
+// $ One: 4/5
+// $ One: 5/5
+// $ Two: 1/2
+// $ Two: 2/2
+```
+
+### Tick Event
+
+```cpp
+// Implement limiter constraining the number of calls to N number of calls over
+// a specified time period. We assume that now() is a function that returns the
+// current time as a `double` in seconds.
+struct limiter {
+  double TimePerCall;
+  double PreviousTime;
+  
+  limiter (int NCalls, int TimePeriod)
+    : TimePerCall(TimePeriod / NCalls),
+      PreviousTime(now()) {
+    // ...
+  } // limiter()
+
+  int n () {
+    double Time = now();
+    double DeltaTime = Time - PreviousTime;
+    int N = floor(DeltaTime / TimePerCall);
+    PreviousTime += N * TimePerCall;
+    return N;
+  } // n()
+}; // struct limiter
+
+// Create emitter
+wheel::emitter Events;
+
+// Add event that is called N times over a specified time period
+Events.create<void ()>("tick");
+
+// Retrieve reference to "tick" event for faster access
+wheel::emitter<>::event &TickEvent = &hooks["tick"];
+
+// Implement "tick" event
+TickEvent
+  .meta_accepts<int, double>()
+  .set_on_insert([&](wheel::handle &Handle) {
+    auto [ N, TimePeriod ] = TickEvent.get_meta<int, double>(Handle);
+    TickEvent.set_meta(Handle,limiter_t(N, TimePeriod));
+  })
+  .set_interceptor([&](wheel::handle &Handle, function<void ()> Target) {
+    auto &[ Limiter ] = TickEvent.get_meta<limiter>(Handle);
+    int N = Limiter.n();
+    for (int I = 0; I < N; ++ I)
+      Target();
+  });
+
+// Add handlers
+TickEvent(60, 1.0) = []() { /* Will be called 60 times per second */ };
+TickEvent(30, 2.0) = []() { /* Will be called 15 times per second */ };
+
+// Main loop. We assume the existance of an `IsRunning` boolean that is `true`
+// so long as the application is running.
+while (IsRunning) {
+  TickEvent.emit();
+}
 ```
 
 ## Documentation
@@ -169,6 +234,7 @@ Events["self-destruct"].unset_on_remove();
       - [event::set_meta()](#eventset_meta)
       - [event::is_meta_of()](#eventis_meta_of)
       - [event::meta_accepts()](#eventmeta_accepts)
+      - [event::meta_accepts_anything()](#eventmeta_accepts_anything)
       - [event::set_on_insert()](#eventset_on_insert)
       - [event::unset_on_insert()](#eventunset_on_insert)
       - [event::set_on_remove()](#eventset_on_remove)
@@ -286,22 +352,22 @@ Lambda object associated with hanled.
 
 ### event::get_meta()
 ```cpp
-template<typename T>
-T &get_meta (handle &Handle);
+template<typename... Args>
+tuple<Args...> &get_meta (handle &Handle);
 ```
-Retrieves metadata object in specified `tuple` type.
+Retrieves metadata tuple with specified types.
 
 #### Template Parameters
-- `T`: Type the metadata is in, which must always include `tuple`.
+- `Args`: Types that the metadata tuple stores.
 
 #### Parameters
-- `Handle`: That refers to the callback metadata will be retrieved from.
+- `Handle`: Refers to the callback that metadata will be retrieved from.
 
 #### Returns
-Metadata associated with the specified handle cast to the specified type.
+Metadata tuple associated with the specified handle.
 
 #### Throws
-`wrong_type` if `T` does not match the underlying metadata.
+`wrong_type` if provided `Args` do not match the underlying types of the metadata for `Handle`.
 
 ##
 
@@ -322,19 +388,19 @@ Arguments that the new metadata tuple should be made from.
 
 ### event::is_meta_of()
 ```cpp
-template<typename T>
+template<typename... Args>
 bool is_meta_of (handle &Handle);
 ```
-Checks what type a metadata object is.
+Checks if the types of the metadata object associated with `Handle` is the specified arguments `Args`.
 
 #### Template Parameters
-- `T`: Type to check if the metadata is of, and this will always be a `tuple` type.
+- `Args`: Types we are comparing with the metadata type to see if they match.
 
 #### Parameters
-- `Handle`: Refers to the callback that owns the metadata to be checked.
+- `Handle`: Handle associated with a callback function.
 
 #### Returns
-`true` if it is of type `T`, and `false` if it is not.
+`true` if the types of metadata match `Args` and `false` otherwise.
 
 ##
 
@@ -343,10 +409,21 @@ Checks what type a metadata object is.
 template<typename... Args>
 event &meta_accepts ();
 ```
-When this is set, only the mentioned meta types are accepted when added by the user through the operator(). If the meta data type is not one of the ones specified here, operator() will henceforth throw a wrong_type exception.
+Call this once for each type the metadata can have. If the user has not specified metadata using operator()() that meets the criteria, the insert() and operator=() functions will throw an exception.
 
 #### Template Parameters
-- `Args`: List of tuples the meta data are permitted to be of.
+- `Args`: Types of a single accepted metadata type.
+
+#### Returns
+`*this` for chaining.
+
+##
+
+### event::meta_accepts_anything()
+```cpp
+event &meta_accepts_anything ();
+```
+This only needs to be called if meta_accepts() has already been called, and the desired behaviour is to undo all hitherto specified accepted meta types, making operator() revert to accept any metadata types whatever.
 
 #### Returns
 `*this` for chaining.
