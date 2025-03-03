@@ -55,6 +55,10 @@ To get started:
 // Create emitter that can store multiple events
 wheel::emitter Events;
 
+// Alternatively, specify a default type for automatic event creation
+// (autovivification) when one that does not exist is accessed.
+// # wheel::emitter<void (int)> Events;
+
 // Add "key-down" event that takes a `char32_t`
 Events.create<void (char32_t)>("key-down");
 
