@@ -43,8 +43,14 @@ Alternatively, clone the repository along with its dependencies (check the
 
 ### Options
 
-Tailor the build to your needs by adjusting the available options. WHEEL itself
-does not have any options, but its dependencies can be configured:
+You have the opportunity for further customization before your call to
+`FetchContent_MakeAvailable()`.
+```cmake
+# If on, enables faster pointer address comparison for `type_info` objects,
+# which assumes that only one library instance is linked
+set(RTTI_POINTER_COMPARISON_MODE <OFF|ON>) # Default: ON
+```
+These dependencies can also be configured:
 - [APORT](https://github.com/wye-sh/aport)
 
 ## Quick Start
