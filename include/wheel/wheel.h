@@ -21,6 +21,13 @@
 #include <optional>
 #include <utility>
 #include <mutex>
+#include <thread>
+
+#ifdef RTTI_POINTER_COMPARISON_MODE
+#  define TYPE_INFO_NEQ(PTR1, PTR2) PTR1 != PTR2
+#else
+#  define TYPE_INFO_NEQ(PTR1, PTR2) *PTR1 != *PTR2
+#endif
 
 namespace wheel {
 
@@ -33,12 +40,19 @@ using namespace std;
  *   representation as a `string`.
  */
 inline string demangle (const char *Name) {
+  // Note: Typically __cxa_demangle() would be set up to free memory also, but
+  //     | due to issues with Cling, we have ended up on an approach where we
+  //     | allocate 4096 bytes, realistically providing enough space for any
+  //     | type that might need to be displayed. If a type takes up more space
+  //     | than that, __cxa_demangle() might still allocate a buffer of its own,
+  //     | which will not be freed, but that is a seemingly low price to pay.
+  //     | And in all honesty, four kB is a lot of memory!
+  size_t Size = 4096;
+  static char *Raw = (char *)malloc(Size);
   int Status = -1;
-  unique_ptr<char, void(*)(void *)> Resource {
-    abi::__cxa_demangle(Name, NULL, NULL, &Status),
-    std::free
-  };
-  return (Status == 0) ? Resource.get() : Name;
+  char *ResultPtr = abi::__cxa_demangle(Name, Raw, &Size, &Status);
+  string Result = Status == 0 ? ResultPtr : Name;
+  return Result;
 } // demangle()
 inline string demangle (const type_info &Info) { return demangle(Info.name()); }
 
@@ -281,12 +295,21 @@ using handle = shared_ptr<int>;
  */
 template<typename T>
 struct thread_local_storage {
-  inline static thread_local unordered_map<thread_local_storage *, T> Values
-    = unordered_map<thread_local_storage *, T>();
+  /*
+   * values()
+   *   Used to be a thread_local inline static, but the Cling interpreter got
+   *   confused when calling erase() on it in the destructor, and so we have
+   *   been forced to use `thread::id`s instead and wrapped it in a function.
+   */
+  static unordered_map<thread_local_storage *, T> &values () {
+    static unordered_map<thread::id, unordered_map<thread_local_storage *, T>>
+      ThreadIdToValues;
+    return ThreadIdToValues[this_thread::get_id()];
+  } // values()
 
   /* ... */
   ~thread_local_storage () {
-    Values.erase(this);
+    values().erase(this);
   } // ~thread_local_storage
 
   /*
@@ -294,7 +317,7 @@ struct thread_local_storage {
    *   Access the element for this instance.
    */
   T &operator* () {
-    return Values[this];
+    return values()[this];
   } // operator*()
 
   /*
@@ -302,7 +325,7 @@ struct thread_local_storage {
    *   Sets it equal to the value of another thread local storage object.
    */
   thread_local_storage &operator= (const thread_local_storage &Value) {
-    Values[this] = Values[const_cast<thread_local_storage *>(&Value)];
+    values()[this] = values()[const_cast<thread_local_storage *>(&Value)];
     return *this;
   } // operator=()
 
@@ -318,7 +341,7 @@ struct thread_local_storage {
         !is_same_v<decay_t<U>, thread_local_storage>
       && is_constructible_v<T, U&&>>>
   thread_local_storage &operator= (U &&Value) {
-    Values[this] = std::forward<U>(Value);
+    values()[this] = std::forward<U>(Value);
     return *this;
   } // operator=()
 }; // struct thread_local_storage
@@ -449,7 +472,7 @@ struct emitter {
       using F = function<T>;
       
       // exception: wrong_type /////////////////////////////////////////////////
-      if (&typeid(F) != AcceptedFunctionType)
+      if (TYPE_INFO_NEQ(&typeid(F), AcceptedFunctionType))
 	throw wrong_type
 	  (Name, { AcceptedFunctionType }, &typeid(F),
 	   "lambda", "get_lambda()");
@@ -476,7 +499,7 @@ struct emitter {
       slot &Slot = Slots[*Handle];
       
       // exception: wrong_type /////////////////////////////////////////////////
-      if (&typeid(T) != Slot.MetaType)
+      if (TYPE_INFO_NEQ(&typeid(T), Slot.MetaType))
 	throw wrong_type
 	  (Name, { Slot.MetaType }, &typeid(T),
 	   "meta", "get_meta()");
@@ -512,6 +535,8 @@ struct emitter {
      *-----------------------------------------------------------------------**/
     template<typename... Args>
     bool is_meta_of (handle &Handle) {
+      // Note: This is safe for pointer comparison mode since we are already not
+      //     | doing a pointer comparison on the `type_info` objects
       return Slots[*Handle].Meta.type() == typeid(tuple<Args...>);
     } // is_meta_of()
     
@@ -604,7 +629,7 @@ struct emitter {
       function NormalizedFunction(Function); // Uniformalize the type
 
       // exception: wrong_type /////////////////////////////////////////////////
-      if (&typeid(NormalizedFunction) != AcceptedInterceptorType)
+      if (TYPE_INFO_NEQ(&typeid(NormalizedFunction), AcceptedInterceptorType))
 	throw wrong_type
 	  (Name, { AcceptedInterceptorType }, &typeid(NormalizedFunction),
 	   "function", "set_interceptor()");
@@ -659,7 +684,7 @@ struct emitter {
       lock_guard Guard(Mutex);
 
       // exception: wrong_type /////////////////////////////////////////////////
-      if (&typeid(function) != AcceptedFunctionType)
+      if (TYPE_INFO_NEQ(&typeid(function), AcceptedFunctionType))
 	throw wrong_type
 	  (Name, { AcceptedFunctionType }, &typeid(function), "function");
       //////////////////////////////////////////////////////////////////////////
@@ -800,10 +825,11 @@ struct emitter {
       lock_guard Guard(Mutex);
 
       // exception: wrong_arguments ////////////////////////////////////////////
-      if (&typeid(function) != AcceptedFunctionType)
+      if (TYPE_INFO_NEQ(&typeid(function), AcceptedFunctionType))
 	throw wrong_arguments::create<Args...>
 	  (AcceptedFunctionParameterString, Name);
       //////////////////////////////////////////////////////////////////////////
+
       IsCalling = true;
       int NSlots = Slots.size();
       for (int I = 0; I < NSlots; ++ I) {

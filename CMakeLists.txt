@@ -42,6 +42,17 @@ target_include_directories(wheel INTERFACE ${INCLUDE_DIRECTORY})
 target_link_libraries(wheel INTERFACE aport)
 
 ################################################################################
+##  options  ###################################################################
+################################################################################
+
+option(RTTI_POINTER_COMPARISON_MODE "When retrieving from tree, will use radix mode." ON)
+if (RTTI_POINTER_COMPARISON_MODE)
+  target_compile_definitions(wheel
+    INTERFACE
+      RTTI_POINTER_COMPARISON_MODE)
+endif()
+
+################################################################################
 ##  testing  ###################################################################
 ################################################################################
 
