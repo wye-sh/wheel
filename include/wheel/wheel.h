@@ -8,8 +8,8 @@
 //                                      ~~~
 
 #pragma once
-#ifndef _WHEEL_CC
-#define _WHEEL_CC
+#ifndef _WHEEL_WHEEL_H
+#define _WHEEL_WHEEL_H
 
 #include <aport/aport.h>
 #include <functional>
