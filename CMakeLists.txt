@@ -14,7 +14,7 @@ set(INCLUDE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include)
 ################################################################################
 
 cmake_minimum_required(VERSION 3.27)
-project(WHEEL VERSION 1.0.0 LANGUAGES CXX C)
+project(WHEEL VERSION 2.0.2 LANGUAGES CXX C)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${LIBRARY_DIRECTORY})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${LIBRARY_DIRECTORY})
