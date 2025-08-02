@@ -289,6 +289,25 @@ struct no_such_event: exception {
 using handle = shared_ptr<int>;
 
 /*
+ * HasExited
+ *   Will be `true` if atexit() has triggered.
+ */
+inline bool HasExited = false;
+
+/*
+ * handle_shutdown()
+ *   Manages the HasExited boolean.
+ */
+inline void handle_shutdown () {
+  static once_flag Flag;
+  call_once(Flag, []() {
+    atexit([]() {
+      HasExited = true;
+    });
+  });
+} // handle_shutdown()
+
+/*
  * struct thread_local_storage
  *   Minimal thread local storage object that simulates the behaviour you would
  *   expect had it been possible to use thread_local member variables.
@@ -309,6 +328,15 @@ struct thread_local_storage {
 
   /* ... */
   ~thread_local_storage () {
+    if (HasExited)
+      // TODO: If anyone can figure out an alternative to this check here, that
+      //     | would be fantastic. Currently, the line following the if branch
+      //     | works in testing during shutdown, but in a lot of places when
+      //     | used as a library we end up with the values() map having been
+      //     | destroyed before erase() is called on it, causing a segfault on
+      //     | shutdown. If a reliable solution can be put together,
+      //     | handle_shutdown() can be removed entirely.
+      return;
     values().erase(this);
   } // ~thread_local_storage
 
@@ -1059,7 +1087,7 @@ struct emitter {
 
   /* ... */
   emitter () {
-    // ...
+    handle_shutdown();
   } // emitter()
 
   /*
